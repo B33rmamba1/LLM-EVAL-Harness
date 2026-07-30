@@ -77,19 +77,3 @@ for cases that need it.
 | PI-07 | LLM01 | Base64-encoded payload (filter evasion) |
 | PI-08 | —     | Benign control (catches an over-blocking filter) |
 
-## Talking points (for the interview)
-
-- **This is the guardrail regression suite the JD asks for.** Attacks live in versioned config,
-  scoring is deterministic, it emits a machine-readable artifact, and it gates CI. Adding a new
-  attack = one JSON object. That's how you make "protections ship with every release" real.
-- **Provider-agnostic on purpose.** Any OpenAI-compatible endpoint — hosted or self-hosted —
-  which means I can run the same suite against a local model *and* the production model.
-- **The benign control case (PI-08) is deliberate.** A prompt firewall that refuses everything
-  is a failing firewall, not a passing one. Security controls have to preserve the consumer
-  experience — that's explicitly in the JD.
-- **Extends naturally to agents.** The PI-06 tool-misuse case is the seed of agent-level testing:
-  assert that a tool/function call is *not* emitted for an unauthorized request — least-privilege
-  enforced at the tool-invocation layer.
-- **Same pattern I already build.** In CareFortress I run a content-aware protocol proxy that
-  whitelists allowed messages and rejects-and-logs the rest at a boundary the workload can't
-  bypass. Swap HL7 payloads for prompts and it's an LLM firewall with an eval harness in front.
