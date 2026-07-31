@@ -1,4 +1,6 @@
-﻿__pycache__/
+__pycache__/
 *.pyc
-results*.json
 .venv/
+# scratch output at repo root (committed artifacts live in results/)
+/results.json
+/results-*.json

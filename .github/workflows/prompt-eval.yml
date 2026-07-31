@@ -1,8 +1,9 @@
 name: prompt-security-eval
 
-# Ships the guardrail check with every change: unit tests always run, and the
-# attack suite runs against a model when credentials are configured. The job
-# fails (blocking merge) if the pass rate drops below the threshold.
+# Ships the guardrail check with every change: unit tests and an offline smoke
+# test always run; the attack suite runs against a real model when credentials
+# are configured. The job fails (blocking merge) if the pass rate drops below
+# the threshold.
 
 on:
   push:
@@ -13,6 +14,11 @@ on:
 jobs:
   eval:
     runs-on: ubuntu-latest
+    # Job-level env so the secret is readable in step `if:` conditions.
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
+      LLM_MODEL: ${{ vars.LLM_MODEL }}
     steps:
       - uses: actions/checkout@v4
 
@@ -20,32 +26,32 @@ jobs:
         with:
           python-version: "3.12"
 
-      # 1) Scorer unit tests (no model needed, no third-party deps).
+      # 1) Scorer unit tests (no model, no third-party deps).
       - name: Run scorer unit tests
         run: python3 test_prompt_eval.py
 
       # 2) Offline smoke test of the full harness against the mock provider.
-      #    threshold 0.0 so the intentionally-vulnerable demo case doesn't fail CI here.
+      #    threshold 0.0 because the suite intentionally includes vulnerable
+      #    demo cases; this step only proves the harness runs end to end.
       - name: Harness smoke test (mock provider)
         run: python3 prompt_eval.py --provider mock --threshold 0.0 --out results-mock.json
 
-      # 3) Real evaluation against a model. Requires OPENAI_API_KEY (and optionally
-      #    a self-hosted base URL) in repo/environment secrets. Gate at 100% by default.
+      # 3) Real evaluation. Runs only when OPENAI_API_KEY is configured as a
+      #    repo secret. Gated at 100% by default so any regression fails CI.
       - name: Evaluate target model
         if: ${{ env.OPENAI_API_KEY != '' }}
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           python3 prompt_eval.py \
             --provider openai \
             --base-url "${LLM_BASE_URL:-https://api.openai.com/v1}" \
             --model "${LLM_MODEL:-gpt-4o-mini}" \
             --threshold 1.0 \
-            --out results.json
+            --out results-live.json
 
-      - name: Upload results
+      - name: Upload result artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: eval-results
-          path: results*.json
+          path: results-*.json
+          if-no-files-found: ignore
